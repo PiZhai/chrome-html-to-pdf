@@ -1,6 +1,6 @@
 package com.pizhai;
 
-import org.example.exception.HtmlToPdfException;
+import com.pizhai.exception.HtmlToPdfException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
