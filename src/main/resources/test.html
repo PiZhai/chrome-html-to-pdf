@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTML转PDF测试页面</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+        h1 {
+            color: #1a73e8;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #202124;
+            margin-top: 30px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .info-box {
+            background-color: #f8f9fa;
+            border-left: 4px solid #1a73e8;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 20px 0;
+        }
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+        }
+        .footer {
+            margin-top: 50px;
+            text-align: center;
+            font-size: 0.9em;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>HTML转PDF测试页面</h1>
+        
+        <div class="info-box">
+            <p>这是一个用于测试HTML转PDF功能的演示页面。该页面包含了各种常见的HTML元素，用于验证转换效果。</p>
+        </div>
+        
+        <h2>项目功能说明</h2>
+        <p>本项目通过WebSocket连接Chrome浏览器的开发工具协议(Chrome DevTools Protocol)，实现了将HTML页面转换为PDF文件的功能。主要流程包括：</p>
+        <ol>
+            <li>查找和启动Chrome浏览器</li>
+            <li>建立WebSocket连接</li>
+            <li>启用Page域</li>
+            <li>导航到本地HTML文件</li>
+            <li>等待页面加载完成</li>
+            <li>生成PDF文件</li>
+        </ol>
+        
+        <h2>表格示例</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>功能模块</th>
+                    <th>描述</th>
+                    <th>状态</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Chrome查找</td>
+                    <td>查找系统中已安装的Chrome浏览器</td>
+                    <td>完成</td>
+                </tr>
+                <tr>
+                    <td>WebSocket连接</td>
+                    <td>与Chrome DevTools Protocol建立连接</td>
+                    <td>完成</td>
+                </tr>
+                <tr>
+                    <td>页面导航</td>
+                    <td>加载HTML页面并等待渲染完成</td>
+                    <td>完成</td>
+                </tr>
+                <tr>
+                    <td>PDF生成</td>
+                    <td>使用Chrome的打印功能生成PDF</td>
+                    <td>完成</td>
+                </tr>
+                <tr>
+                    <td>异常处理</td>
+                    <td>处理转换过程中可能出现的各种异常</td>
+                    <td>完成</td>
+                </tr>
+            </tbody>
+        </table>
+        
+        <h2>图文混排示例</h2>
+        <p>这里应该有一张图片，但由于是测试文件，可以在实际使用时替换为真实图片：</p>
+        <div style="text-align: center; margin: 20px 0;">
+            <div style="border: 1px dashed #ccc; padding: 20px; display: inline-block;">
+                <div style="width: 200px; height: 200px; background: linear-gradient(45deg, #1a73e8, #8ab4f8); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">
+                    图片占位符
+                </div>
+            </div>
+            <p><em>图1: 示例图片说明</em></p>
+        </div>
+        
+        <h2>代码示例</h2>
+        <pre style="background-color: #f6f8fa; padding: 16px; border-radius: 6px; overflow: auto;">
+public class HtmlToPdfConverter implements AutoCloseable {
+    // 将HTML文件转换为PDF
+    public void convert(String htmlFilePath, String outputPdfPath) throws HtmlToPdfException {
+        // 实现代码...
+    }
+}
+        </pre>
+        
+        <div class="footer">
+            <p>© 2023 HTML转PDF测试 | 本页面仅用于功能测试</p>
+        </div>
+    </div>
+</body>
+</html> 
