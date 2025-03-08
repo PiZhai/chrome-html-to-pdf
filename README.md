@@ -26,7 +26,7 @@
 ```xml
 <dependency>
     <groupId>org.example</groupId>
-    <artifactId>html-to-pdf</artifactId>
+    <artifactId>chrome-html-to-pdf</artifactId>
     <version>1.0.0</version>
 </dependency>
 ```
