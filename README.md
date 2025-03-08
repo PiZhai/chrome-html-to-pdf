@@ -25,7 +25,7 @@
 
 ```xml
 <dependency>
-    <groupId>org.example</groupId>
+    <groupId>com.pizhai</groupId>
     <artifactId>chrome-html-to-pdf</artifactId>
     <version>1.0.0</version>
 </dependency>
