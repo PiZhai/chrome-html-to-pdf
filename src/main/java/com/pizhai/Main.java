@@ -21,7 +21,7 @@ public class Main {
         properties.setProperty("org.slf4j.simpleLogger.showThreadName", "true");
         properties.setProperty("org.slf4j.simpleLogger.showLogName", "true");
         properties.setProperty("org.slf4j.simpleLogger.showShortLogName", "true");
-        
+
         // 设置各包的日志级别
         properties.setProperty("org.slf4j.simpleLogger.log.org.example.cdp", "info");
         properties.setProperty("org.slf4j.simpleLogger.log.org.example.chrome", "info");
@@ -80,6 +80,25 @@ public class Main {
 
             converter.convert(htmlFilePath, customOutputPath, options);
             logger.info("转换成功 (自定义选项): {}", customOutputPath);
+
+        } catch (Exception e) {
+            handleException(e);
+        }
+
+        // 示例3: 获取PDF字节数组
+        try (HtmlToPdfConverter converter = HtmlToPdfConverter.builder()
+                .chromePath(chromePath)
+                .build()) {
+
+            logger.info("示例3: 获取PDF字节数组");
+            byte[] pdfData = converter.convertToByteArray(htmlFilePath);
+
+            // 这里可以进行其他操作，例如：
+            // - 发送到HTTP响应
+            // - 保存到数据库
+            // - 处理为其他格式
+
+            logger.info("获取到PDF数据: {} 字节", pdfData.length);
 
         } catch (Exception e) {
             handleException(e);

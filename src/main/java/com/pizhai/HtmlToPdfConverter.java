@@ -140,6 +140,52 @@ public class HtmlToPdfConverter implements AutoCloseable {
     }
 
     /**
+     * 将HTML文件转换为PDF字节数组
+     *
+     * @param htmlFilePath HTML文件路径
+     * @return PDF文件的字节数组
+     * @throws HtmlToPdfException 如果转换过程中发生错误
+     */
+    public byte[] convertToByteArray(String htmlFilePath) throws HtmlToPdfException {
+        return convertToByteArray(htmlFilePath, new PdfOptions.Builder().build());
+    }
+
+    /**
+     * 将HTML文件转换为PDF字节数组
+     *
+     * @param htmlFilePath HTML文件路径
+     * @param options PDF生成选项
+     * @return PDF文件的字节数组
+     * @throws HtmlToPdfException 如果转换过程中发生错误
+     */
+    public byte[] convertToByteArray(String htmlFilePath, PdfOptions options) throws HtmlToPdfException {
+        File htmlFile = new File(htmlFilePath);
+        if (!htmlFile.exists() || !htmlFile.isFile()) {
+            logger.error("HTML文件不存在: {}", htmlFilePath);
+            throw new HtmlToPdfException("HTML文件不存在: " + htmlFilePath);
+        }
+
+        try {
+            // 构建文件URL，确保正确格式化
+            String fileUrl = formatFileUrl(htmlFile);
+            logger.info("加载HTML文件: {}", fileUrl);
+
+            // 导航到HTML文件
+            devToolsClient.navigateToUrl(fileUrl);
+
+            // 生成PDF
+            logger.info("生成PDF数据");
+            byte[] pdfData = devToolsClient.generatePdfAsByteArray(convertToCdpOptions(options));
+
+            logger.info("PDF数据生成成功: {} 字节", pdfData.length);
+            return pdfData;
+        } catch (Exception e) {
+            logger.error("HTML转PDF字节数组失败", e);
+            throw new HtmlToPdfException("HTML转PDF字节数组失败: " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * 将PdfOptions转换为ChromeDevToolsClient.PdfOptions
      */
     private ChromeDevToolsClient.PdfOptions convertToCdpOptions(PdfOptions options) {

@@ -204,6 +204,31 @@ public class ChromeDevToolsClient extends WebSocketClient {
      */
     public void generatePdf(String outputPath, PdfOptions options) throws PdfGenerationException {
         try {
+            // 生成PDF数据
+            byte[] pdfData = generatePdfAsByteArray(options);
+
+            // 写入文件
+            logger.info("保存PDF到文件: {}", outputPath);
+            File outputFile = new File(outputPath);
+            Files.write(outputFile.toPath(), pdfData);
+
+        } catch (PdfGenerationException e) {
+            throw e;
+        } catch (Exception e) {
+            logger.error("保存PDF文件过程中发生异常", e);
+            throw new PdfGenerationException("保存PDF文件失败: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 生成PDF并返回字节数组
+     *
+     * @param options PDF生成选项
+     * @return PDF数据的字节数组
+     * @throws PdfGenerationException 如果生成过程中发生错误
+     */
+    public byte[] generatePdfAsByteArray(PdfOptions options) throws PdfGenerationException {
+        try {
             Map<String, Object> params = new HashMap<>();
 
             // 设置PDF选项
@@ -221,7 +246,7 @@ public class ChromeDevToolsClient extends WebSocketClient {
                 params.put("preferCSSPageSize", options.isPreferCSSPageSize());
             }
 
-            logger.info("正在请求生成PDF...");
+            logger.info("正在请求生成PDF数据...");
             // 生成PDF
             JsonObject response = sendCommand("Page.printToPDF", params);
 
@@ -238,15 +263,12 @@ public class ChromeDevToolsClient extends WebSocketClient {
             String base64Data = response.getAsJsonObject("result").get("data").getAsString();
             byte[] pdfData = Base64.getDecoder().decode(base64Data);
 
-            logger.info("PDF数据大小: {} 字节", pdfData.length);
-
-            // 写入文件
-            File outputFile = new File(outputPath);
-            Files.write(outputFile.toPath(), pdfData);
+            logger.info("PDF数据生成成功: {} 字节", pdfData.length);
+            return pdfData;
 
         } catch (Exception e) {
-            logger.error("生成PDF过程中发生异常", e);
-            throw new PdfGenerationException("生成PDF失败: " + e.getMessage(), e);
+            logger.error("生成PDF数据过程中发生异常", e);
+            throw new PdfGenerationException("生成PDF数据失败: " + e.getMessage(), e);
         }
     }
 
