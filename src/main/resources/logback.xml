@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- 控制台输出 -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+    
+    <!-- 项目日志级别 -->
+    <logger name="com.pizhai" level="DEBUG" />
+    
+    <!-- Chrome启动器详细日志 -->
+    <logger name="com.pizhai.chrome.ChromeLauncher" level="DEBUG" />
+    
+    <!-- 连接池详细日志 -->
+    <logger name="com.pizhai.pool" level="DEBUG" />
+    
+    <!-- 根日志级别 -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE" />
+    </root>
+</configuration> 

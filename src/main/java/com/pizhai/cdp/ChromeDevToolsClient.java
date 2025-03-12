@@ -34,9 +34,28 @@ public class ChromeDevToolsClient extends WebSocketClient {
 
     private final AtomicInteger requestId = new AtomicInteger(1);
     private final Map<Integer, CompletableFuture<JsonObject>> pendingRequests = new ConcurrentHashMap<>();
+    private final Object launcher;
 
+    /**
+     * Chrome开发工具客户端构造函数
+     *
+     * @param webSocketUrl WebSocket URL
+     * @throws ConnectionException 如果连接失败
+     */
     public ChromeDevToolsClient(String webSocketUrl) throws ConnectionException {
+        this(webSocketUrl, null);
+    }
+
+    /**
+     * Chrome开发工具客户端构造函数，包含Chrome启动器引用
+     *
+     * @param webSocketUrl WebSocket URL
+     * @param launcher Chrome启动器引用，用于管理Chrome进程生命周期
+     * @throws ConnectionException 如果连接失败
+     */
+    public ChromeDevToolsClient(String webSocketUrl, Object launcher) throws ConnectionException {
         super(URI.create(webSocketUrl));
+        this.launcher = launcher;
 
         try {
             logger.info("正在连接到Chrome DevTools WebSocket: {}", webSocketUrl);
@@ -44,9 +63,16 @@ public class ChromeDevToolsClient extends WebSocketClient {
             if (!connected) {
                 throw new ConnectionException("连接Chrome DevTools WebSocket失败");
             }
+
+            // 初始化连接
+            enablePage();
+
+            logger.info("成功连接到Chrome DevTools: {}", webSocketUrl);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new ConnectionException("连接Chrome DevTools WebSocket被中断", e);
+            throw new ConnectionException("连接Chrome DevTools被中断", e);
+        } catch (Exception e) {
+            throw new ConnectionException("连接Chrome DevTools失败: " + e.getMessage(), e);
         }
     }
 
@@ -448,4 +474,4 @@ public class ChromeDevToolsClient extends WebSocketClient {
             throw new ConnectionException("启用Network域失败", e);
         }
     }
-} 
+}

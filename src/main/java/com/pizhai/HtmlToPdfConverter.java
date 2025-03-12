@@ -4,6 +4,8 @@ import com.pizhai.cdp.ChromeDevToolsClient;
 import com.pizhai.chrome.ChromeFinder;
 import com.pizhai.chrome.ChromeLauncher;
 import com.pizhai.exception.HtmlToPdfException;
+import com.pizhai.pool.ChromeConnectionPool;
+import com.pizhai.pool.DefaultChromeConnectionPool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,10 +43,15 @@ public class HtmlToPdfConverter implements AutoCloseable {
     private static final Logger logger = LoggerFactory.getLogger(HtmlToPdfConverter.class);
     private static final int DEFAULT_DEBUGGING_PORT = 9222;
 
+    // 单例模式
     private final ChromeLauncher chromeLauncher;
     private ChromeDevToolsClient devToolsClient;
     private final String chromePath;
     private final int debuggingPort;
+
+    // 连接池模式
+    private final ChromeConnectionPool connectionPool;
+    private final boolean usePool;
 
     /**
      * 私有构造函数，通过构建器创建实例
@@ -52,13 +59,30 @@ public class HtmlToPdfConverter implements AutoCloseable {
     private HtmlToPdfConverter(Builder builder) {
         this.chromePath = builder.chromePath;
         this.debuggingPort = builder.debuggingPort;
-        this.chromeLauncher = new ChromeLauncher();
 
-        initialize();
+        // 根据配置决定使用单例模式还是连接池模式
+        if (builder.useConnectionPool) {
+            this.usePool = true;
+            this.connectionPool = builder.connectionPool != null ?
+                    builder.connectionPool :
+                    DefaultChromeConnectionPool.builder()
+                            .chromePath(chromePath)
+                            .basePort(debuggingPort)
+                            .maxConnections(builder.poolMaxConnections)
+                            .idleTimeout(builder.poolIdleTimeout, builder.poolIdleTimeoutUnit)
+                            .build();
+            this.chromeLauncher = null;
+            this.devToolsClient = null;
+        } else {
+            this.usePool = false;
+            this.connectionPool = null;
+            this.chromeLauncher = new ChromeLauncher();
+            initialize();
+        }
     }
 
     /**
-     * 初始化Chrome浏览器和WebSocket连接
+     * 初始化Chrome浏览器和WebSocket连接（单例模式）
      */
     private void initialize() throws HtmlToPdfException {
         try {
@@ -81,6 +105,26 @@ public class HtmlToPdfConverter implements AutoCloseable {
             close();
             logger.error("初始化Chrome失败", e);
             throw new HtmlToPdfException.ConnectionException("连接Chrome DevTools失败: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 获取一个ChromeDevToolsClient连接（从连接池或单例）
+     */
+    private ChromeDevToolsClient getClient() throws HtmlToPdfException {
+        if (usePool) {
+            return connectionPool.getConnection();
+        } else {
+            return devToolsClient;
+        }
+    }
+
+    /**
+     * 释放一个ChromeDevToolsClient连接（归还到连接池或不操作）
+     */
+    private void releaseClient(ChromeDevToolsClient client) {
+        if (usePool && client != null) {
+            connectionPool.releaseConnection(client);
         }
     }
 
@@ -110,7 +154,10 @@ public class HtmlToPdfConverter implements AutoCloseable {
             throw new HtmlToPdfException("HTML文件不存在: " + htmlFilePath);
         }
 
+        ChromeDevToolsClient client = null;
         try {
+            client = getClient();
+
             // 构建文件URL，确保正确格式化
             String fileUrl = formatFileUrl(htmlFile);
             logger.info("加载HTML文件: {}", fileUrl);
@@ -126,16 +173,18 @@ public class HtmlToPdfConverter implements AutoCloseable {
             }
 
             // 导航到HTML文件
-            devToolsClient.navigateToUrl(fileUrl);
+            client.navigateToUrl(fileUrl);
 
             // 生成PDF
             logger.info("生成PDF文件: {}", outputPdfPath);
-            devToolsClient.generatePdf(outputPdfPath, convertToCdpOptions(options));
+            client.generatePdf(outputPdfPath, convertToCdpOptions(options));
 
             logger.info("PDF生成成功: {}", outputPdfPath);
         } catch (Exception e) {
-            logger.error("HTML转PDF失败", e); // 记录完整堆栈跟踪
+            logger.error("HTML转PDF失败", e);
             throw new HtmlToPdfException("HTML转PDF失败: " + e.getMessage(), e);
+        } finally {
+            releaseClient(client);
         }
     }
 
@@ -154,7 +203,7 @@ public class HtmlToPdfConverter implements AutoCloseable {
      * 将HTML文件转换为PDF字节数组
      *
      * @param htmlFilePath HTML文件路径
-     * @param options PDF生成选项
+     * @param options      PDF生成选项
      * @return PDF文件的字节数组
      * @throws HtmlToPdfException 如果转换过程中发生错误
      */
@@ -165,23 +214,28 @@ public class HtmlToPdfConverter implements AutoCloseable {
             throw new HtmlToPdfException("HTML文件不存在: " + htmlFilePath);
         }
 
+        ChromeDevToolsClient client = null;
         try {
+            client = getClient();
+
             // 构建文件URL，确保正确格式化
             String fileUrl = formatFileUrl(htmlFile);
             logger.info("加载HTML文件: {}", fileUrl);
 
             // 导航到HTML文件
-            devToolsClient.navigateToUrl(fileUrl);
+            client.navigateToUrl(fileUrl);
 
             // 生成PDF
             logger.info("生成PDF数据");
-            byte[] pdfData = devToolsClient.generatePdfAsByteArray(convertToCdpOptions(options));
+            byte[] pdfData = client.generatePdfAsByteArray(convertToCdpOptions(options));
 
             logger.info("PDF数据生成成功: {} 字节", pdfData.length);
             return pdfData;
         } catch (Exception e) {
             logger.error("HTML转PDF字节数组失败", e);
             throw new HtmlToPdfException("HTML转PDF字节数组失败: " + e.getMessage(), e);
+        } finally {
+            releaseClient(client);
         }
     }
 
@@ -190,7 +244,7 @@ public class HtmlToPdfConverter implements AutoCloseable {
      */
     private ChromeDevToolsClient.PdfOptions convertToCdpOptions(PdfOptions options) {
         ChromeDevToolsClient.PdfOptions cdpOptions = new ChromeDevToolsClient.PdfOptions();
-        return cdpOptions.setLandscape(options.isLandscape())
+        cdpOptions.setLandscape(options.isLandscape())
                 .setPrintBackground(options.isPrintBackground())
                 .setScale(options.getScale())
                 .setPaperWidth(options.getPaperWidth())
@@ -201,6 +255,7 @@ public class HtmlToPdfConverter implements AutoCloseable {
                 .setMarginRight(options.getMarginRight())
                 .setPageRanges(options.getPageRanges())
                 .setPreferCSSPageSize(options.isPreferCSSPageSize());
+        return cdpOptions;
     }
 
     /**
@@ -215,8 +270,11 @@ public class HtmlToPdfConverter implements AutoCloseable {
             String fileUrl = file.toURI().toURL().toString();
 
             // 处理Windows路径，确保格式正确
-            if (File.separatorChar == '\\' && !fileUrl.startsWith("file:///")) {
-                fileUrl = fileUrl.replace("file:/", "file:///");
+            if (File.separatorChar == '\\') {
+                // 确保URL中使用正确的斜杠
+                if (!fileUrl.startsWith("file:///")) {
+                    fileUrl = fileUrl.replace("file:/", "file:///");
+                }
             }
 
             return fileUrl;
@@ -232,19 +290,30 @@ public class HtmlToPdfConverter implements AutoCloseable {
      */
     @Override
     public void close() {
-        // 关闭WebSocket连接
-        if (devToolsClient != null) {
-            try {
-                devToolsClient.close();
-            } catch (Exception e) {
-                logger.error("关闭WebSocket连接失败", e);
+        if (usePool) {
+            // 关闭连接池
+            if (connectionPool instanceof AutoCloseable) {
+                try {
+                    ((AutoCloseable) connectionPool).close();
+                } catch (Exception e) {
+                    logger.error("关闭连接池失败", e);
+                }
             }
-            devToolsClient = null;
-        }
+        } else {
+            // 关闭WebSocket连接
+            if (devToolsClient != null) {
+                try {
+                    devToolsClient.close();
+                } catch (Exception e) {
+                    logger.error("关闭WebSocket连接失败", e);
+                }
+                devToolsClient = null;
+            }
 
-        // 关闭Chrome进程
-        if (chromeLauncher != null) {
-            chromeLauncher.close();
+            // 关闭Chrome进程
+            if (chromeLauncher != null) {
+                chromeLauncher.close();
+            }
         }
     }
 
@@ -258,11 +327,105 @@ public class HtmlToPdfConverter implements AutoCloseable {
     }
 
     /**
+     * 获取默认实例（使用共享连接池）
+     *
+     * @return 默认的HtmlToPdfConverter实例
+     */
+    public static HtmlToPdfConverter getInstance() {
+        return SingletonHolder.INSTANCE;
+    }
+
+    /**
+     * 单例持有者（延迟加载）
+     */
+    private static class SingletonHolder {
+        static {
+            // 尝试自动配置Chrome环境
+            try {
+                // 尝试加载配置文件
+                try {
+                    Config.loadFromResource("html2pdf.properties");
+                    logger.info("已从配置文件加载Chrome配置");
+                } catch (Exception e) {
+                    logger.debug("未找到配置文件，尝试自动检测环境");
+
+                    try {
+                        Class<?> envClass = Class.forName("org.example.util.ChromeEnvironment");
+                        java.lang.reflect.Method autoConfigMethod = envClass.getMethod("autoConfig");
+                        autoConfigMethod.invoke(null);
+                    } catch (Exception ex) {
+                        logger.debug("自动环境配置不可用，将使用默认设置");
+                    }
+                }
+            } catch (Exception e) {
+                logger.debug("配置加载过程中出现异常，将使用默认设置: {}", e.getMessage());
+            }
+        }
+
+        private static final HtmlToPdfConverter INSTANCE = builder()
+                .useSharedConnectionPool()
+                .build();
+    }
+
+    /**
+     * 静态方法：使用共享连接池将HTML转换为PDF
+     *
+     * @param htmlFilePath HTML文件路径
+     * @param outputPdfPath 输出PDF文件路径
+     * @throws HtmlToPdfException 如果转换过程中发生错误
+     */
+    public static void convertStatic(String htmlFilePath, String outputPdfPath) throws HtmlToPdfException {
+        getInstance().convert(htmlFilePath, outputPdfPath);
+    }
+
+    /**
+     * 静态方法：使用共享连接池将HTML转换为PDF
+     *
+     * @param htmlFilePath HTML文件路径
+     * @param outputPdfPath 输出PDF文件路径
+     * @param options PDF生成选项
+     * @throws HtmlToPdfException 如果转换过程中发生错误
+     */
+    public static void convertStatic(String htmlFilePath, String outputPdfPath, PdfOptions options) throws HtmlToPdfException {
+        getInstance().convert(htmlFilePath, outputPdfPath, options);
+    }
+
+    /**
+     * 静态方法：使用共享连接池将HTML转换为PDF字节数组
+     *
+     * @param htmlFilePath HTML文件路径
+     * @return PDF文件的字节数组
+     * @throws HtmlToPdfException 如果转换过程中发生错误
+     */
+    public static byte[] convertToBytes(String htmlFilePath) throws HtmlToPdfException {
+        return getInstance().convertToByteArray(htmlFilePath);
+    }
+
+    /**
+     * 静态方法：使用共享连接池将HTML转换为PDF字节数组
+     *
+     * @param htmlFilePath HTML文件路径
+     * @param options PDF生成选项
+     * @return PDF文件的字节数组
+     * @throws HtmlToPdfException 如果转换过程中发生错误
+     */
+    public static byte[] convertToBytes(String htmlFilePath, PdfOptions options) throws HtmlToPdfException {
+        return getInstance().convertToByteArray(htmlFilePath, options);
+    }
+
+    /**
      * HtmlToPdfConverter的构建器
      */
     public static class Builder {
         private String chromePath;
         private int debuggingPort = DEFAULT_DEBUGGING_PORT;
+
+        // 连接池配置
+        private boolean useConnectionPool = false;
+        private ChromeConnectionPool connectionPool;
+        private int poolMaxConnections = 5;
+        private long poolIdleTimeout = 5;
+        private java.util.concurrent.TimeUnit poolIdleTimeoutUnit = java.util.concurrent.TimeUnit.MINUTES;
 
         /**
          * 设置Chrome可执行文件路径
@@ -283,6 +446,63 @@ public class HtmlToPdfConverter implements AutoCloseable {
          */
         public Builder debuggingPort(int debuggingPort) {
             this.debuggingPort = debuggingPort;
+            return this;
+        }
+
+        /**
+         * 启用连接池模式
+         *
+         * @param usePool 是否使用连接池
+         * @return 构建器实例
+         */
+        public Builder useConnectionPool(boolean usePool) {
+            this.useConnectionPool = usePool;
+            return this;
+        }
+
+        /**
+         * 设置现有的连接池
+         *
+         * @param pool 连接池实例
+         * @return 构建器实例
+         */
+        public Builder connectionPool(ChromeConnectionPool pool) {
+            this.connectionPool = pool;
+            return this;
+        }
+
+        /**
+         * 设置连接池最大连接数
+         *
+         * @param maxConnections 最大连接数
+         * @return 构建器实例
+         */
+        public Builder poolMaxConnections(int maxConnections) {
+            this.poolMaxConnections = maxConnections;
+            return this;
+        }
+
+        /**
+         * 设置连接池空闲超时
+         *
+         * @param timeout 超时时间
+         * @param unit   时间单位
+         * @return 构建器实例
+         */
+        public Builder poolIdleTimeout(long timeout, java.util.concurrent.TimeUnit unit) {
+            this.poolIdleTimeout = timeout;
+            this.poolIdleTimeoutUnit = unit;
+            return this;
+        }
+
+        /**
+         * 使用共享连接池
+         *
+         * @return 构建器实例
+         */
+        public Builder useSharedConnectionPool() {
+            this.useConnectionPool = true;
+            this.connectionPool = com.pizhai.pool.SharedConnectionPool.getInstance();
             return this;
         }
 
@@ -507,9 +727,9 @@ public class HtmlToPdfConverter implements AutoCloseable {
             }
 
             /**
-             * 设置是否优先使用CSS页面尺寸
+             * 设置是否优先使用CSS页面大小
              *
-             * @param preferCSSPageSize 是否优先使用CSS页面尺寸
+             * @param preferCSSPageSize 是否优先使用CSS页面大小
              * @return 构建器实例
              */
             public Builder preferCSSPageSize(boolean preferCSSPageSize) {
@@ -527,4 +747,166 @@ public class HtmlToPdfConverter implements AutoCloseable {
             }
         }
     }
-} 
+
+    /**
+     * 配置类 - 用于配置单例转换器和共享连接池
+     */
+    public static class Config {
+
+        /**
+         * 设置Chrome浏览器路径
+         * 必须在获取单例实例前调用
+         *
+         * @param path Chrome可执行文件的路径
+         */
+        public static void setChromePath(String path) {
+            // 配置共享连接池的Chrome路径
+            com.pizhai.pool.SharedConnectionPool.Config.setChromePath(path);
+        }
+
+        /**
+         * 设置最小连接数
+         *
+         * @param count 最小连接数
+         */
+        public static void setMinConnections(int count) {
+            com.pizhai.pool.SharedConnectionPool.Config.setMinConnections(count);
+        }
+
+        /**
+         * 设置最大连接数
+         *
+         * @param count 最大连接数
+         */
+        public static void setMaxConnections(int count) {
+            com.pizhai.pool.SharedConnectionPool.Config.setMaxConnections(count);
+        }
+
+        /**
+         * 设置空闲连接超时
+         *
+         * @param timeout 超时时间
+         * @param unit 时间单位
+         */
+        public static void setIdleTimeout(long timeout, java.util.concurrent.TimeUnit unit) {
+            com.pizhai.pool.SharedConnectionPool.Config.setIdleTimeout(timeout, unit);
+        }
+
+        /**
+         * 设置基础调试端口
+         *
+         * @param port 基础端口号
+         */
+        public static void setBasePort(int port) {
+            com.pizhai.pool.SharedConnectionPool.Config.setBasePort(port);
+        }
+
+        /**
+         * 从配置文件加载配置
+         * 支持的配置项:
+         * - html2pdf.chrome.path: Chrome浏览器路径
+         * - html2pdf.pool.min-connections: 最小连接数
+         * - html2pdf.pool.max-connections: 最大连接数
+         * - html2pdf.pool.base-port: 基础调试端口
+         * - html2pdf.pool.idle-timeout-seconds: 空闲超时(秒)
+         *
+         * @param configPath 配置文件路径(properties格式)
+         */
+        public static void loadFromFile(String configPath) {
+            try {
+                java.util.Properties props = new java.util.Properties();
+                try (java.io.FileInputStream fis = new java.io.FileInputStream(configPath)) {
+                    props.load(fis);
+                }
+
+                loadFromProperties(props);
+
+                logger.info("已从配置文件加载配置: {}", configPath);
+            } catch (Exception e) {
+                logger.error("加载配置文件失败: {}", e.getMessage());
+                throw new RuntimeException("加载配置文件失败", e);
+            }
+        }
+
+        /**
+         * 从资源文件加载配置
+         *
+         * @param resourcePath 资源文件路径(相对于classpath的路径)
+         */
+        public static void loadFromResource(String resourcePath) {
+            try {
+                java.util.Properties props = new java.util.Properties();
+                try (java.io.InputStream is = Thread.currentThread().getContextClassLoader().getResourceAsStream(resourcePath)) {
+                    if (is == null) {
+                        throw new RuntimeException("找不到资源文件: " + resourcePath);
+                    }
+                    props.load(is);
+                }
+
+                loadFromProperties(props);
+
+                logger.info("已从资源文件加载配置: {}", resourcePath);
+            } catch (Exception e) {
+                logger.error("加载资源文件配置失败: {}", e.getMessage());
+                throw new RuntimeException("加载资源文件配置失败", e);
+            }
+        }
+
+        /**
+         * 从Properties对象加载配置
+         *
+         * @param props Properties对象
+         */
+        public static void loadFromProperties(java.util.Properties props) {
+            // 获取Chrome路径
+            String chromePath = props.getProperty("html2pdf.chrome.path");
+            if (chromePath != null && !chromePath.trim().isEmpty()) {
+                setChromePath(chromePath.trim());
+            }
+
+            // 获取最小连接数
+            String minConnStr = props.getProperty("html2pdf.pool.min-connections");
+            if (minConnStr != null && !minConnStr.trim().isEmpty()) {
+                try {
+                    int minConn = Integer.parseInt(minConnStr.trim());
+                    setMinConnections(minConn);
+                } catch (NumberFormatException e) {
+                    logger.warn("解析最小连接数失败: {}", minConnStr);
+                }
+            }
+
+            // 获取最大连接数
+            String maxConnStr = props.getProperty("html2pdf.pool.max-connections");
+            if (maxConnStr != null && !maxConnStr.trim().isEmpty()) {
+                try {
+                    int maxConn = Integer.parseInt(maxConnStr.trim());
+                    setMaxConnections(maxConn);
+                } catch (NumberFormatException e) {
+                    logger.warn("解析最大连接数失败: {}", maxConnStr);
+                }
+            }
+
+            // 获取基础端口
+            String basePortStr = props.getProperty("html2pdf.pool.base-port");
+            if (basePortStr != null && !basePortStr.trim().isEmpty()) {
+                try {
+                    int basePort = Integer.parseInt(basePortStr.trim());
+                    setBasePort(basePort);
+                } catch (NumberFormatException e) {
+                    logger.warn("解析基础端口失败: {}", basePortStr);
+                }
+            }
+
+            // 获取空闲超时
+            String idleTimeoutStr = props.getProperty("html2pdf.pool.idle-timeout-seconds");
+            if (idleTimeoutStr != null && !idleTimeoutStr.trim().isEmpty()) {
+                try {
+                    long idleTimeout = Long.parseLong(idleTimeoutStr.trim());
+                    setIdleTimeout(idleTimeout, java.util.concurrent.TimeUnit.SECONDS);
+                } catch (NumberFormatException e) {
+                    logger.warn("解析空闲超时失败: {}", idleTimeoutStr);
+                }
+            }
+        }
+    }
+}
