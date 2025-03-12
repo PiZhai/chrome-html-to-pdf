@@ -38,8 +38,8 @@
 
 ```xml
 <dependency>
-    <groupId>org.example</groupId>
-    <artifactId>html-to-pdf</artifactId>
+    <groupId>com-pizhai</groupId>
+    <artifactId>chrome-html-to-pdf</artifactId>
     <version>1.0.0</version>
 </dependency>
 ```
