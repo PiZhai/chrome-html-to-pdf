@@ -59,20 +59,28 @@ public class Main {
             return;
         }
 
-        // 示例1: 单例模式 - 不使用连接池
-//        singleInstanceExample(htmlFilePath, outputPdfPath, chromePath);
+        try {
+            // 示例1: 单例模式 - 不使用连接池
+            // singleInstanceExample(htmlFilePath, outputPdfPath, chromePath);
 
-        // 示例2: 连接池模式 - 默认配置
-//        connectionPoolExample(htmlFilePath, outputPdfPath, chromePath);
+            // 示例2: 连接池模式 - 默认配置
+            // connectionPoolExample(htmlFilePath, outputPdfPath, chromePath);
 
-        // 示例3: 连接池模式 - 自定义配置
-//        customPoolExample(htmlFilePath, outputPdfPath, chromePath);
+            // 示例3: 连接池模式 - 自定义配置
+            // customPoolExample(htmlFilePath, outputPdfPath, chromePath);
 
-        // 示例4: 使用共享连接池和单例模式
-//        sharedPoolExample(htmlFilePath, outputPdfPath, chromePath);
+            // 示例4: 使用共享连接池和单例模式
+            // sharedPoolExample(htmlFilePath, outputPdfPath, chromePath);
 
-        // 示例5: 使用环境自动配置
-        environmentAutoConfigExample(htmlFilePath, outputPdfPath);
+            // 示例5: 使用环境自动配置
+            //environmentAutoConfigExample(htmlFilePath, outputPdfPath);
+
+            // 示例6: 使用HTML字符串转PDF
+            htmlStringToPdfExample();
+
+        } catch (Exception e) {
+            logger.error("转换过程中出错", e);
+        }
     }
 
     /**
@@ -402,6 +410,80 @@ public class Main {
 
         long endTime = System.currentTimeMillis();
         logger.info("环境自动配置模式耗时: {} 毫秒", (endTime - startTime));
+    }
+
+    /**
+     * 示例6: 将HTML字符串直接转换为PDF
+     */
+    private static void htmlStringToPdfExample() {
+        logger.info("=== 示例6: HTML字符串转PDF ===");
+
+        // 示例HTML内容
+        String htmlContent = "<!DOCTYPE html>\n" +
+                "<html>\n" +
+                "<head>\n" +
+                "    <meta charset=\"UTF-8\">\n" +
+                "    <title>HTML字符串示例</title>\n" +
+                "    <style>\n" +
+                "        body { font-family: Arial, sans-serif; margin: 40px; }\n" +
+                "        h1 { color: #2c3e50; text-align: center; }\n" +
+                "        .content { border: 1px solid #ddd; padding: 20px; border-radius: 5px; }\n" +
+                "        .highlight { background-color: #f8f9fa; padding: 10px; border-left: 4px solid #28a745; }\n" +
+                "    </style>\n" +
+                "</head>\n" +
+                "<body>\n" +
+                "    <h1>HTML字符串转PDF示例</h1>\n" +
+                "    <div class=\"content\">\n" +
+                "        <p>这是一个直接从HTML字符串生成PDF的示例。</p>\n" +
+                "        <p>当前时间: " + new java.util.Date() + "</p>\n" +
+                "        <div class=\"highlight\">\n" +
+                "            <p>优点：</p>\n" +
+                "            <ul>\n" +
+                "                <li>无需创建HTML文件</li>\n" +
+                "                <li>适合动态生成的内容</li>\n" +
+                "                <li>更加灵活和方便</li>\n" +
+                "            </ul>\n" +
+                "        </div>\n" +
+                "    </div>\n" +
+                "</body>\n" +
+                "</html>";
+
+        long startTime = System.currentTimeMillis();
+
+        try {
+            // 默认选项
+            byte[] pdfBytes = HtmlToPdfConverter.convertHtmlToBytes(htmlContent);
+            logger.info("PDF生成成功，大小: {} 字节", pdfBytes.length);
+
+            // 保存到文件（演示用）
+            String outputPath = "output_from_string.pdf";
+            try (java.io.FileOutputStream fos = new java.io.FileOutputStream(outputPath)) {
+                fos.write(pdfBytes);
+            }
+            logger.info("PDF已保存到: {}", new File(outputPath).getAbsolutePath());
+
+            // 使用自定义选项
+            HtmlToPdfConverter.PdfOptions options = HtmlToPdfConverter.PdfOptions.builder()
+                    .landscape(true)
+                    .printBackground(true)
+                    .build();
+
+            byte[] pdfBytes2 = HtmlToPdfConverter.convertHtmlToBytes(htmlContent, options);
+            logger.info("横向PDF生成成功，大小: {} 字节", pdfBytes2.length);
+
+            // 保存到文件（演示用）
+            String outputPath2 = "output_from_string_landscape.pdf";
+            try (java.io.FileOutputStream fos = new java.io.FileOutputStream(outputPath2)) {
+                fos.write(pdfBytes2);
+            }
+            logger.info("横向PDF已保存到: {}", new File(outputPath2).getAbsolutePath());
+
+        } catch (Exception e) {
+            logger.error("HTML字符串转PDF失败", e);
+        }
+
+        long endTime = System.currentTimeMillis();
+        logger.info("HTML字符串转PDF耗时: {} 毫秒", (endTime - startTime));
     }
 
     /**

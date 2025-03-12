@@ -350,7 +350,7 @@ public class HtmlToPdfConverter implements AutoCloseable {
                     logger.debug("未找到配置文件，尝试自动检测环境");
 
                     try {
-                        Class<?> envClass = Class.forName("org.example.util.ChromeEnvironment");
+                        Class<?> envClass = Class.forName("com.pizhai.util.ChromeEnvironment");
                         java.lang.reflect.Method autoConfigMethod = envClass.getMethod("autoConfig");
                         autoConfigMethod.invoke(null);
                     } catch (Exception ex) {
@@ -411,6 +411,84 @@ public class HtmlToPdfConverter implements AutoCloseable {
      */
     public static byte[] convertToBytes(String htmlFilePath, PdfOptions options) throws HtmlToPdfException {
         return getInstance().convertToByteArray(htmlFilePath, options);
+    }
+
+    /**
+     * 将HTML字符串转换为PDF字节数组
+     *
+     * @param htmlContent HTML内容字符串
+     * @return PDF文件的字节数组
+     * @throws HtmlToPdfException 如果转换过程中发生错误
+     */
+    public byte[] convertHtmlStringToByteArray(String htmlContent) throws HtmlToPdfException {
+        return convertHtmlStringToByteArray(htmlContent, new PdfOptions.Builder().build());
+    }
+
+    /**
+     * 将HTML字符串转换为PDF字节数组
+     *
+     * @param htmlContent HTML内容字符串
+     * @param options     PDF生成选项
+     * @return PDF文件的字节数组
+     * @throws HtmlToPdfException 如果转换过程中发生错误
+     */
+    public byte[] convertHtmlStringToByteArray(String htmlContent, PdfOptions options) throws HtmlToPdfException {
+        if (htmlContent == null || htmlContent.trim().isEmpty()) {
+            throw new HtmlToPdfException("HTML内容不能为空");
+        }
+
+        File tempFile = null;
+        try {
+            // 创建临时HTML文件
+            tempFile = File.createTempFile("html2pdf_", ".html");
+
+            // 写入HTML内容
+            try (java.io.FileWriter writer = new java.io.FileWriter(tempFile)) {
+                writer.write(htmlContent);
+            }
+
+            logger.debug("已将HTML内容写入临时文件: {}", tempFile.getAbsolutePath());
+
+            // 转换为PDF字节数组
+            return convertToByteArray(tempFile.getAbsolutePath(), options);
+
+        } catch (Exception e) {
+            logger.error("HTML字符串转PDF字节数组失败", e);
+            throw new HtmlToPdfException("HTML字符串转PDF字节数组失败: " + e.getMessage(), e);
+        } finally {
+            // 删除临时文件
+            if (tempFile != null && tempFile.exists()) {
+                boolean deleted = tempFile.delete();
+                if (!deleted) {
+                    logger.warn("无法删除临时HTML文件: {}", tempFile.getAbsolutePath());
+                    // 在JVM退出时尝试删除
+                    tempFile.deleteOnExit();
+                }
+            }
+        }
+    }
+
+    /**
+     * 静态方法：使用共享连接池将HTML字符串转换为PDF字节数组
+     *
+     * @param htmlContent HTML内容字符串
+     * @return PDF文件的字节数组
+     * @throws HtmlToPdfException 如果转换过程中发生错误
+     */
+    public static byte[] convertHtmlToBytes(String htmlContent) throws HtmlToPdfException {
+        return getInstance().convertHtmlStringToByteArray(htmlContent);
+    }
+
+    /**
+     * 静态方法：使用共享连接池将HTML字符串转换为PDF字节数组
+     *
+     * @param htmlContent HTML内容字符串
+     * @param options     PDF生成选项
+     * @return PDF文件的字节数组
+     * @throws HtmlToPdfException 如果转换过程中发生错误
+     */
+    public static byte[] convertHtmlToBytes(String htmlContent, PdfOptions options) throws HtmlToPdfException {
+        return getInstance().convertHtmlStringToByteArray(htmlContent, options);
     }
 
     /**
