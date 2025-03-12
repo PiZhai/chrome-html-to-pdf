@@ -9,7 +9,7 @@
     </appender>
     
     <!-- 项目日志级别 -->
-    <logger name="com.pizhai" level="DEBUG" />
+    <logger name="com.pizhai" level="INFO" />
     
     <!-- Chrome启动器详细日志 -->
     <logger name="com.pizhai.chrome.ChromeLauncher" level="DEBUG" />
